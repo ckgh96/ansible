@@ -1,0 +1,49 @@
+---
+
+- name: configure iptables
+  hosts: all
+  tasks:
+    - include_vars: vars.yaml
+
+    - name: install iptables persistent
+      apt: name=netfilter-persistent state=present update_cache=true
+
+    - name: flush existing firewall rules
+      iptables:
+        flush: true
+
+    - name: flush iptables other rules
+      command: iptables -X
+
+    - name: allow loop back
+      iptables: chain=INPUT action=append in_interface=lo jump=ACCEPT
+
+    - name: allow established and related traffic
+      iptables:
+        chain: INPUT
+        ctstate: ESTABLISHED,RELATED
+        jump: ACCEPT
+
+    - name: allow SSH traffic
+      iptables:
+        chain: INPUT
+        destination_port: "{{ sshport }}"
+        jump: ACCEPT
+        protocol: tcp
+
+    - name: drop other inputs
+      iptables:
+        chain: INPUT
+        jump: DROP
+
+    - name: save ipv4 rules
+      community.general.iptables_state:
+        state: saved
+        path: /etc/iptables/rules.v4
+
+    - name: save ipv6 rules
+      community.general.iptables_state:
+        ip_version: ipv6
+        table: filter
+        state: saved
+        path: /etc/iptables/rules.v6

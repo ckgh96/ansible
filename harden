@@ -1,0 +1,79 @@
+NEWUSER=user
+PASSWORD=password
+SSHPORT=777
+SSHKEY=”xxx”
+
+apt update && apt upgrade -y && apt autoremove -y
+
+adduser $NEWUSER --gecos "First Last,RoomNumber,WorkPhone,HomePhone" --disabled-password
+echo "$NEWUSER:$PASSWORD" | chpasswd
+adduser $NEWUSER sudo
+
+sed -i 's/^PermitRootLogin yes/PermitRootLogin no'/ /etc/ssh/sshd_config
+sed -i 's/^#PasswordAuthentication yes/PasswordAuthentication no' /etc/ssh/sshd_config
+sed -i '/^#TCPKeepAlive yes/a AllowTcpForwarding no' /etc/ssh/sshd_config
+sed -i 's/^X11Forwarding yes/X11Forwarding no'/ /etc/ssh/sshd_config
+sed -i 's/^UsePAM yes/UsePAM no'/ /etc/ssh/sshd_config
+sed -i '$ a AddressFamily inet' /etc/ssh/sshd_config
+sed -i "$ a AllowUsers $NEWUSER" /etc/ssh/sshd_config
+sed -i "s/^#Port 22/Port $SSHPORT"/ /etc/ssh/sshd_config
+
+apt install fail2ban -y
+cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local
+sed -i '/^\[sshd\]/a enabled = true\nfilter = sshd\nbantime = 1800\nfindtime = 1800\nmaxretry = 3' /etc/fail2ban/jail.local
+sed -i "s/^\(port[ ]*=\) ssh/\1 $SSHPORT"/ /etc/fail2ban/jail.local
+
+iptables -F
+iptables -X
+iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+iptables -A INPUT -p tcp --dport $SSHPORT -j ACCEPT
+iptables -I INPUT 1 -i lo -j ACCEPT
+iptables -A INPUT -j DROP
+DEBIAN_FRONTEND=noninteractive apt install iptables-persistent -y
+iptables-save > /etc/iptables/rules.v4
+iptables-save > /etc/iptables/rules.v6
+
+sed -i '$ a net.ipv6.conf.all.disable_ipv6 = 1' /etc/sysctl.conf
+sed -i '$ a net.ipv6.conf.default.disable_ipv6 = 1' /etc/sysctl.conf
+sed -i '$ a net.ipv6.conf.lo.disable_ipv6 = 1' /etc/sysctl.conf
+sysctl -p
+
+# make settings persist
+echo '#!/bin/bash' >> /etc/rc.local
+echo '# /etc/rc.local' >> /etc/rc.local
+echo >> /etc/rc.local
+echo '/etc/sysctl.d' >> /etc/rc.local
+echo '/etc/init.d/procps restart' >> /etc/rc.local
+echo >> /etc/rc.local
+echo 'exit 0' >> /etc/rc.local
+chmod 755 /etc/rc.local
+
+apt update && apt upgrade -y && apt autoremove -y
+
+DEBIAN_FRONTEND=noninteractive dpkg-reconfigure unattended-upgrades
+
+sed -i '/-updates/s/^\/\///g' /etc/apt/apt.conf.d/50unattended-upgrades
+sed -i 's/\/\/Unattended-Upgrade::Automatic-Reboot "false";/Unattended-Upgrade::Automatic-Reboot "true";'/ /etc/apt/apt.conf.d/50unattended-upgrades
+sed -i 's/\/\/Unattended-Upgrade::Remove-Unused-Kernel-Packages "false";/Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";'/ /etc/apt/apt.conf.d/50unattended-upgrades
+sed -i 's/\/\/Unattended-Upgrade::Remove-Unused-Dependencies "false";/Unattended-Upgrade::Remove-Unused-Dependencies "true";'/ /etc/apt/apt.conf.d/50unattended-upgrades
+sed -i 's/\/\/Unattended-Upgrade::Remove-Unused-Dependencies "true";/Unattended-Upgrade::Remove-Unused-Dependencies "true";'/ /etc/apt/apt.conf.d/50unattended-upgrades
+
+#should set
+#APT::Periodic::Update-Package-Lists "1";
+#APT::Periodic::Download-Upgradeable-Packages "1";
+#APT::Periodic::AutocleanInterval "7";
+
+sed -i 's/^APT::Periodic::Download-Upgradeable-Packages "0"/APT::Periodic::Download-Upgradeable-Packages "1"'/ /etc/apt/apt.conf.d/10periodic
+sed -i 's/^APT::Periodic::AutocleanInterval "0"/APT::Periodic::AutocleanInterval "7"'/ /etc/apt/apt.conf.d/10periodic
+
+#setup key-based authentication
+mkdir /home/$NEWUSER/.ssh
+echo $SSHKEY >> /home/$NEWUSER/.ssh/authorized_keys
+chmod -R go= /home/$NEWUSER/.ssh
+chown -R $NEWUSER:$NEWUSER /home/$NEWUSER/.ssh
+sed -i 's/^PasswordAuthentication yes/PasswordAuthentication no'/ /etc/ssh/sshd_config
+
+apt update && apt upgrade -y && apt autoremove -y
+
+reboot
+

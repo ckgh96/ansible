@@ -1,0 +1,67 @@
+- name: setup ssh
+  hosts: all
+  tasks:
+    - include_vars: vars.yaml
+    - name: Add a new user
+      user:
+        user: "{{ user_name }}"
+        shell: /bin/bash
+        password: "{{ user_password | password_hash('sha512') }}"
+    
+    - name: Add SSH public key for user
+      authorized_key:
+        user: "{{ user_name }}"
+        key: "{{ lookup('file', user_keyfile) }}"
+        state: present
+    
+    - name: add to sudo
+      lineinfile:
+        path: /etc/group
+        regexp: ^(sudo.*)
+        line: \1,{{ user_name }}
+        backrefs: yes
+
+    - name: Disallow root SSH access
+      lineinfile: dest=/etc/ssh/sshd_config
+                  regexp="^PermitRootLogin"
+                  line="PermitRootLogin no"
+                  state=present
+
+    - name: Disallow password authentication
+      lineinfile: dest=/etc/ssh/sshd_config
+                  regexp="^PasswordAuthentication"
+                  line="PasswordAuthentication no"
+                  state=present
+
+    - name: disallow TCP Forwarding
+      lineinfile: dest=/etc/ssh/sshd_config
+                  line="AllowTcpForwarding no"
+                  insertafter="^#TCPKeepAlive yes"
+
+    - name: Disallow X11 Forwarding
+      lineinfile: dest=/etc/ssh/sshd_config
+                  regexp="^X11Forwarding yes"
+                  line="X11Forwarding no"
+                  state=present
+
+    - name: Do not use PAM
+      lineinfile: dest=/etc/ssh/sshd_config
+                  regexp="^UsePAM yes"
+                  line="UsePAM no"
+                  state=present
+
+    - name: use IPv4
+      lineinfile: dest=/etc/ssh/sshd_config
+                  line="AddressFamily inet"
+                  insertbefore=EOF
+
+    - name: Add user to AllowUsers
+      lineinfile: dest=/etc/ssh/sshd_config
+                  line="AllowUsers {{ user_name }}"
+                  insertbefore=EOF
+
+    - name: change SSH port
+      lineinfile: dest=/etc/ssh/sshd_config
+                  regexp="^#Port 22"
+                  line="Port {{ sshport }}"
+                  state=present

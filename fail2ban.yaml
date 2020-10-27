@@ -1,0 +1,26 @@
+- name: setup fail2ban
+  hosts: all
+  tasks:
+    - include_vars: vars.yaml
+
+    - name: install fail2ban
+      package:
+        name: fail2ban
+        state: present
+
+    - name: copy default config file
+      copy:
+        src: /etc/fail2ban/jail.conf
+        dest: /etc/fail2ban/jail.local
+        remote_src: yes
+
+    - name: change SSH port
+      replace:
+          path: /etc/fail2ban/jail.local
+          regexp: '^(port[ ]*=) ssh'
+          replace: '\1 {{ sshport }}'
+
+    - name: enable fail2ban ssh monitoring
+      lineinfile: dest=/etc/fail2ban/jail.local
+                  line="enabled = true\nfilter = sshd\nbantime = 1800\nfindtime = 1800\nmaxretry = 3"
+                  insertafter="\[sshd\]"
