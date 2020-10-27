@@ -3,7 +3,7 @@
 - name: configure iptables
   hosts: all
   tasks:
-    - include_vars: vars.yaml
+    - include_vars: config/vars.yaml
 
     - name: install iptables persistent
       apt: name=netfilter-persistent state=present update_cache=true
@@ -31,6 +31,13 @@
         jump: ACCEPT
         protocol: tcp
 
+    - name: allow SSH traffic
+      iptables:
+        chain: INPUT
+        destination_port: 22
+        jump: ACCEPT
+        protocol: tcp
+
     - name: drop other inputs
       iptables:
         chain: INPUT
@@ -55,3 +62,65 @@
 
     - name: reload sysctl
       command: sysctl -p
+
+    - name: Install unattended-upgrades
+      package:
+        name: unattended-upgrades
+        state: present
+
+    - name: allow updates
+      lineinfile: dest=/etc/apt/apt.conf.d/50unattended-upgrades
+                  regexp="^//(.*)-updates(.*)"
+                  line=\1-updates\2
+                  state=present
+
+    - name: allow automatic reboots
+      lineinfile: dest=/etc/apt/apt.conf.d/50unattended-upgrades
+                  regexp="//Unattended-Upgrade::Automatic-Reboot \"false\";"
+                  line="Unattended-Upgrade::Automatic-Reboot \"true\""
+                  state=present
+
+    - name: remove unused kernel packages
+      lineinfile: dest=/etc/apt/apt.conf.d/50unattended-upgrades
+                  regexp="//Unattended-Upgrade::Remove-Unused-Kernel-Packages \"true\";"
+                  line="Unattended-Upgrade::Remove-Unused-Kernel-Packages \"true\";"
+                  state=present
+
+    - name: remove new unused dependencies
+      lineinfile: dest=/etc/apt/apt.conf.d/50unattended-upgrades
+                  regexp="//Unattended-Upgrade::Remove-New-Unused-Dependencies \"true\";"
+                  line="Unattended-Upgrade::Remove-New-Unused-Dependencies \"true\";"
+                  state=present
+
+    - name: remove unused dependencies
+      lineinfile: dest=/etc/apt/apt.conf.d/50unattended-upgrades
+                  regexp="//Unattended-Upgrade::Remove-Unused-Dependencies \"false\";"
+                  line="Unattended-Upgrade::Remove-Unused-Dependencies \"true\";"
+                  state=present
+
+    - name: Download-Upgradeable-Packages
+      lineinfile: dest=/etc/apt/apt.conf.d/10periodic
+                  regexp="APT::Periodic::Download-Upgradeable-Packages \"0\";"
+                  line="APT::Periodic::Download-Upgradeable-Packages \"1\";"
+                  state=present
+
+    - name: set AutocleanInterval
+      lineinfile: dest=/etc/apt/apt.conf.d/10periodic
+                  regexp="APT::Periodic::AutocleanInterval \"0\";"
+                  line="APT::Periodic::AutocleanInterval \"7\";"
+                  state=present
+
+    - name: set AutocleanInterval
+      file:
+        path: /home/{{ user_name }}/.ssh
+        state: directory
+        mode: 700
+        owner: "{{ user_name }}"
+        group: "{{ user_name }}"
+
+    - name: Change file ownership, group and permissions
+      file:
+        path: /home/{{ user_name }}/.ssh/authorized_keys
+        owner: "{{ user_name }}"
+        group: "{{ user_name }}"
+        mode: '0644'

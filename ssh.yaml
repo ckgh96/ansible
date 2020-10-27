@@ -1,11 +1,12 @@
 - name: setup ssh
   hosts: all
   tasks:
-    - include_vars: vars.yaml
+    - include_vars: config/vars.yaml
     - name: Add a new user
       user:
         user: "{{ user_name }}"
         shell: /bin/bash
+        update_password: on_create
         password: "{{ user_password | password_hash('sha512') }}"
     
     - name: Add SSH public key for user

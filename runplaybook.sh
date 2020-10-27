@@ -1,2 +1,1 @@
-ansible-playbook -i :wq
-k
+ansible-playbook -i config/ansiblehosts playbook.yaml --ask-pass

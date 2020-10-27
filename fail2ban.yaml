@@ -1,7 +1,7 @@
 - name: setup fail2ban
   hosts: all
   tasks:
-    - include_vars: vars.yaml
+    - include_vars: config/vars.yaml
 
     - name: install fail2ban
       package:
