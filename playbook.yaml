@@ -1,5 +1,6 @@
 - import_playbook: updateupgrade.yaml
 - import_playbook: ssh.yaml
 - import_playbook: fail2ban.yaml
+- import_playbook: unattendedupgrades.yaml
 - import_playbook: iptables.yaml
 #- import_playbook: setupovpn.yaml
